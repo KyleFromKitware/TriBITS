@@ -135,6 +135,8 @@ FUNCTION(TRIBITS_ABORT_ON_MISSING_PACKAGE   DEP_PKG  PACKAGE_NAME  DEP_PKG_LIST_
     "Error, the package '${DEP_PKG}' is listed as a dependency of the package"
     " '${PACKAGE_NAME}' is in the list '${DEP_PKG_LIST_NAME}' but the package"
     " '${DEP_PKG}' is either not defined or is listed later in the package order."
+    "  This may also be an attempt to create a cicular dependency between"
+    " the packages '${DEP_PKG}' and '${PACKAGE_NAME}' (which is not allowed)."
     "  Check the spelling of '${DEP_PKG}' or see how it is listed in"
     " ${PROJECT_NAME}_PACKAGES_AND_DIRS_AND_CLASSIFICATIONS in relationship to"
     " '${PACKAGE_NAME}'.")
@@ -477,6 +479,8 @@ MACRO(TRIBITS_PACKAGE_DEFINE_DEPENDENCIES)
      ${ARGN}
      )
 
+  TRIBITS_CHECK_FOR_UNPARSED_ARGUMENTS()
+
   SET(LIB_REQUIRED_DEP_PACKAGES ${PARSE_LIB_REQUIRED_PACKAGES})
   SET(LIB_OPTIONAL_DEP_PACKAGES ${PARSE_LIB_OPTIONAL_PACKAGES})
   SET(TEST_REQUIRED_DEP_PACKAGES ${PARSE_TEST_REQUIRED_PACKAGES})
@@ -495,7 +499,6 @@ MACRO(TRIBITS_PACKAGE_DEFINE_DEPENDENCIES)
   #   by the number of columns!
 
 ENDMACRO()
-
 
 
 MACRO(TRIBITS_SAVE_OFF_DEPENENCIES_VARS  POSTFIX)

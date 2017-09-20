@@ -81,7 +81,7 @@ TRIBITS_ADD_ADVANCED_TEST( RawHelloWorld
 
 
 SET(TribitsHelloWorld_COMMON_CONFIG_ARGS
-  ${COMMON_ENV_ARGS_PASSTHROUGH}
+  ${SERIAL_PASSTHROUGH_CONFIGURE_ARGS}
   )
 
 TRIBITS_ADD_ADVANCED_TEST( TribitsHelloWorld
@@ -90,7 +90,8 @@ TRIBITS_ADD_ADVANCED_TEST( TribitsHelloWorld
   TEST_0 CMND ${CMAKE_COMMAND}
     ARGS
       ${TribitsHelloWorld_COMMON_CONFIG_ARGS}
-      -DTribitsHelloWorld_ENABLE_CPACK_PACKAGING=ON
+      -DTribitsHelloWorld_ENABLE_TESTS=ON
+      -DHelloWorld_ENABLE_CPACK_PACKAGING=ON
       ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsHelloWorld
     PASS_REGULAR_EXPRESSION_ALL
       "Configuring done"
@@ -1746,7 +1747,7 @@ TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_ALL_NoFortran_WrapExternal_Verb
   OVERALL_NUM_MPI_PROCS 1
 
   TEST_0
-    MESSSAGE "Do a verbose configure and check that the packages coupling variables are correct."
+    MESSAGE "Do a verbose configure and check that the packages coupling variables are correct."
     CMND ${CMAKE_COMMAND}
     ARGS
       ${TribitsExampleProject_COMMON_CONFIG_ARGS}
@@ -1834,7 +1835,7 @@ TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_ALL_NoFortran_OverridePackageSo
     ARGS -r TribitsExampleProject/packages/with_subpackages/
 
   TEST_3
-    MESSSAGE "Override with_packages/ source dir and configure"
+    MESSAGE "Override with_packages/ source dir and configure"
     CMND ${CMAKE_COMMAND}
     ARGS
       ${TribitsExampleProject_COMMON_CONFIG_ARGS}
@@ -2862,6 +2863,35 @@ TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProjectAddons
 ########################################################################
 
 
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleMetaProject_Empty
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Configure TribitsExampleMetaProject with nothing in it"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${COMMON_ENV_ARGS_PASSTHROUGH}
+      -DTribitsExMetaProj_ENABLE_Fortran=OFF
+      -DTribitsExMetaProj_IGNORE_MISSING_EXTRA_REPOSITORIES=TRUE
+      ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleMetaProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "WARNING: Ignoring missing extra repo 'TribitsExampleProject' as requested since .*/TribitsExampleMetaProject/TribitsExampleProject does not exist"
+      "WARNING: Ignoring missing extra repo 'TribitsExampleProjectAddons' as requested since .*/TribitsExampleMetaProject/TribitsExampleProjectAddons does not exist"
+      "Final set of enabled SE packages:  0"
+      "Final set of non-enabled SE packages:  0"
+      "WARNING:  There were no packages configured so no libraries or tests/examples will be built"
+      "Configuring done"
+      "Generating done"
+    ALWAYS_FAIL_ON_NONZERO_RETURN
+
+  )
+# NOTE: That above test is the only test that triggers an empty list that
+# tries to get reversed.  This is a TriBITS project with no packages and no
+# TPLs.  While not common, it is a starter sitiation that users will have so
+# it should be have smoothly.
+
+
 TRIBITS_ADD_ADVANCED_TEST( TribitsExampleMetaProject
   OVERALL_WORKING_DIRECTORY TEST_NAME
   OVERALL_NUM_MPI_PROCS 1
@@ -2958,4 +2988,300 @@ TRIBITS_ADD_ADVANCED_TEST( TribitsExampleMetaProject
       "Test .*: Addon1_test .* Passed"
       "100% tests passed, 0 tests failed out of"
 
+  )
+
+
+########################################################################
+# User error checking tests
+########################################################################
+
+
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_PkgWithUserErrors_PASS
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Copy TribitsExampleProject so that we can copy in PkgWithUserErrors."
+    CMND cp
+    ARGS -r ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleProject .
+
+  TEST_1
+    MESSAGE "Copy PkgWithUserErrors to base dir."
+    CMND cp
+    ARGS -r ${CMAKE_CURRENT_SOURCE_DIR}/PkgWithUserErrors
+      TribitsExampleProject/.
+
+  TEST_2
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Explicitly enabled packages on input [(]by user[)]:  PkgWithUserErrors 1"
+      "Final set of enabled packages:  PkgWithUserErrors 1"
+      "Processing enabled package: PkgWithUserErrors [(]Libs, Tests, Examples[)]"
+      "Configuring done"
+      "Generating done" 
+    ALWAYS_FAIL_ON_NONZERO_RETURN
+
+  TEST_3 CMND make
+    ARGS ${CTEST_BUILD_FLAGS}
+    PASS_REGULAR_EXPRESSION_ALL
+      "Built target PkgWithUserErrors_PkgWithUserErrorsTest"
+    ALWAYS_FAIL_ON_NONZERO_RETURN
+
+  TEST_4 CMND ${CMAKE_CTEST_COMMAND} ARGS -VV
+    PASS_REGULAR_EXPRESSION_ALL
+      "Test [#]1: PkgWithUserErrors_PkgWithUserErrorsTest[_MPI1]* [.]+ +Passed"
+    ALWAYS_FAIL_ON_NONZERO_RETURN
+
+  )
+
+
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_PkgWithUserErrors_PACKAGE_POST_PROCESS
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Copy TribitsExampleProject so that we can copy in PkgWithUserErrors."
+    CMND cp
+    ARGS -r ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleProject .
+
+  TEST_1
+    MESSAGE "Copy PkgWithUserErrors to base dir."
+    CMND cp
+    ARGS -r ${CMAKE_CURRENT_SOURCE_DIR}/PkgWithUserErrors
+      TribitsExampleProject/.
+
+  TEST_2
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_SKIP_PACKAGE_POST_PROCESS=TRUE
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Processing enabled package: PkgWithUserErrors [(]Libs, Tests, Examples[)]"
+      "ERROR: Forgot to call TRIBITS_PACKAGE_POSTPROCESS[(][)] .*/TribitsExampleProject/PkgWithUserErrors/CMakeLists.txt" 
+    ALWAYS_FAIL_ON_ZERO_RETURN
+  )
+
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_PkgWithUserErrors_SKIP_PACKAGE_INIT
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Copy TribitsExampleProject so that we can copy in PkgWithUserErrors."
+    CMND cp
+    ARGS -r ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleProject .
+
+  TEST_1
+    MESSAGE "Copy PkgWithUserErrors to base dir."
+    CMND cp
+    ARGS -r ${CMAKE_CURRENT_SOURCE_DIR}/PkgWithUserErrors
+      TribitsExampleProject/.
+
+  TEST_2
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_SKIP_TRIBITS_PACKAGE_INIT=TRUE
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Must call TRIBITS_PACKAGE[(][)] before TRIBITS_ADD_LIBRARY[(][)]"
+      "Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  TEST_3
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_SKIP_TRIBITS_PACKAGE_INIT=TRUE
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=FALSE
+      -DPkgWithUserErrors_ADD_EXECUTABLE_BEFORE_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Must call TRIBITS_PACKAGE[(][)] before TRIBITS_ADD_EXECUTABLE[(][)]"
+      "Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  TEST_4
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_SKIP_TRIBITS_PACKAGE_INIT=TRUE
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=FALSE
+      -DPkgWithUserErrors_ADD_EXECUTABLE_BEFORE_POST_PROCESS=""
+      -DPkgWithUserErrors_SKIP_PACKAGE_TESTS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Must call TRIBITS_PACKAGE[(][)] before TRIBITS_PACKAGE_POSTPROCESS[(][)]"
+      "Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  )
+
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_PkgWithUserErrors_TARGETS_AFTER_POSTPROCESS
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Copy TribitsExampleProject so that we can copy in PkgWithUserErrors."
+    CMND cp
+    ARGS -r ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleProject .
+
+  TEST_1
+    MESSAGE "Copy PkgWithUserErrors to base dir."
+    CMND cp
+    ARGS -r ${CMAKE_CURRENT_SOURCE_DIR}/PkgWithUserErrors
+      TribitsExampleProject/.
+
+  TEST_2
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_ADD_LIBRARY_BEFORE_POST_PROCESS=FALSE
+      -DPkgWithUserErrors_ADD_LIBRARY_AFTER_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Must call TRIBITS_ADD_LIBRARY[(][)] before TRIBITS_PACKAGE_POSTPROCESS[(][)] in"
+      "Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  TEST_3
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      -DPkgWithUserErrors_ADD_LIBRARY_AFTER_POST_PROCESS=FALSE
+      -DPkgWithUserErrors_ADD_EXECUTABLE_AFTER_POST_PROCESS=TRUE
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "Must call TRIBITS_ADD_EXECUTABLE[(][)] before TRIBITS_PACKAGE_POSTPROCESS[(][)] in"
+      "Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  )
+
+TRIBITS_ADD_ADVANCED_TEST( TribitsExampleProject_PkgWithUserErrors_UNPARSED_ARGS
+  OVERALL_WORKING_DIRECTORY TEST_NAME
+  OVERALL_NUM_MPI_PROCS 1
+
+  TEST_0
+    MESSAGE "Copy TribitsExampleProject so that we can copy in PkgWithUserErrors."
+    CMND cp
+    ARGS -r ${${PROJECT_NAME}_TRIBITS_DIR}/examples/TribitsExampleProject .
+
+  TEST_1
+    MESSAGE "Copy PkgWithUserErrors to base dir."
+    CMND cp
+    ARGS -r ${CMAKE_CURRENT_SOURCE_DIR}/PkgWithUserErrors
+      TribitsExampleProject/.
+
+  TEST_2
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_CHECK_FOR_UNPARSED_ARGUMENTS=FATAL_ERROR
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DPkgWithUserErrors_UNPARSED_ARGS_DEFINE_DEPENDENCIES=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "CMake Error at.*TribitsGeneralMacros.cmake:"
+      "Arguments are being passed in but not used.  UNPARSED_ARGUMENTS ="
+      "nonsense_jdslkfhlskd"
+      "TRIBITS_READ_PACKAGE_DEPENDENCIES"
+      "-- Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  TEST_3
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DPkgWithUserErrors_UNPARSED_ARGS_DEFINE_DEPENDENCIES=OFF
+      -DPkgWithUserErrors_UNPARSED_ARGS_ADD_LIBRARY=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "CMake Error at.*TribitsGeneralMacros.cmake:"
+      "Arguments are being passed in but not used.  UNPARSED_ARGUMENTS ="
+      "this_shouldnt_be_here"
+      "PkgWithUserErrors/CMakeLists.txt.*TRIBITS_ADD_LIBRARY"
+      "-- Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
+
+  TEST_4
+    MESSAGE "Configure PkgWithUserErrors"
+    CMND ${CMAKE_COMMAND}
+    ARGS
+      ${TribitsExampleProject_COMMON_CONFIG_ARGS}
+      -DTribitsExProj_TRIBITS_DIR=${${PROJECT_NAME}_TRIBITS_DIR}
+      -DTribitsExProj_ENABLE_Fortran=OFF
+      -DTribitsExProj_EXTRA_REPOSITORIES=PkgWithUserErrors
+      -DTribitsExProj_ENABLE_PkgWithUserErrors=ON
+      -DPkgWithUserErrors_UNPARSED_ARGS_DEFINE_DEPENDENCIES=OFF
+      -DPkgWithUserErrors_UNPARSED_ARGS_ADD_LIBRARY=OFF
+      -DPkgWithUserErrors_UNPARSED_ARGS_ADD_EXECUTABLE=ON
+      -DTribitsExProj_ENABLE_TESTS=ON
+      TribitsExampleProject
+    PASS_REGULAR_EXPRESSION_ALL
+      "CMake Error at.*TribitsGeneralMacros.cmake:"
+      "Arguments are being passed in but not used.  UNPARSED_ARGUMENTS ="
+      "misspelled_argument"
+      "PkgWithUserErrors/CMakeLists.txt.*TRIBITS_ADD_EXECUTABLE"
+      "-- Configuring incomplete, errors occurred!"
+    ALWAYS_FAIL_ON_ZERO_RETURN
   )
